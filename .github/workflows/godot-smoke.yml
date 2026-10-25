@@ -1,0 +1,25 @@
+name: Godot smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  godot-headless:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
+      - name: Import project
+        run: godot --headless --path . --editor --import --quit
+      - name: Smoke test driving and audio
+        run: godot --headless --path . --script res://tests/smoke_test.gd
