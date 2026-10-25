@@ -1,0 +1,14 @@
+# Godot 4 generated project cache
+.godot/
+
+# Local build outputs and signing credentials
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
