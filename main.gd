@@ -1,111 +1,223 @@
 extends Node3D
+## Little Railways v0.2 — accessible touch driving experience.
 
-const TRACK_RADIUS := 19.0
-var progress := 0.0
-var speed := 0.0
-var throttle := 0.0
-var braking := false
-var train: Node3D
+const WorldScript = preload("res://scripts/world.gd")
+const TrainScript = preload("res://scripts/train.gd")
+const SoundScript = preload("res://scripts/sound_fx.gd")
+const CAMERA_NAMES := ["Chase", "Driver", "Scenic"]
+
+var world
+var train
+var sounds
 var camera: Camera3D
+var camera_mode := 0
+var go_held := false
+var slow_held := false
+var brake_held := false
 var speed_label: Label
-var camera_inside := false
+var throttle_label: Label
+var throttle_bar: ProgressBar
+var message_label: Label
+var camera_button: Button
+var message_seconds := 0.0
+var last_arrived_station := -1
+
 
 func _ready() -> void:
-	_build_world()
-	_build_controls()
-
-func box(parent: Node3D, position: Vector3, size: Vector3, color: Color) -> MeshInstance3D:
-	var item := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	item.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	item.material_override = mat
-	item.position = position
-	parent.add_child(item)
-	return item
-
-func _build_world() -> void:
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55, -25, 0)
-	add_child(sun)
-	var env := WorldEnvironment.new()
-	var sky := ProceduralSkyMaterial.new()
-	sky.sky_top_color = Color("77c8f8")
-	var e := Environment.new()
-	e.background_mode = Environment.BG_SKY
-	e.sky = Sky.new()
-	e.sky.sky_material = sky
-	env.environment = e
-	add_child(env)
-	box(self, Vector3(0,-0.55,0), Vector3(65,1,65), Color("77bb67"))
-	for i in range(128):
-		var a := TAU * i / 128.0
-		var p := Vector3(cos(a)*TRACK_RADIUS, 0, sin(a)*TRACK_RADIUS)
-		var sleeper := box(self, p, Vector3(2.8,0.18,0.36), Color("80553d"))
-		sleeper.rotation.y = -a
-		for offset in [-0.85, 0.85]:
-			var rail := box(self, p + Vector3(cos(a)*offset,0.17,sin(a)*offset), Vector3(0.12,0.12,1.03), Color("c5cbd1"))
-			rail.rotation.y = -a
-	for i in range(3):
-		var a := TAU*i/3.0
-		var p := Vector3(cos(a)*25,0,sin(a)*25)
-		box(self,p+Vector3(0,1.1,0),Vector3(6,2.2,3),Color("f8df9a"))
-		box(self,p+Vector3(0,2.5,0),Vector3(7,0.5,4),Color("d95757"))
-	train = Node3D.new()
+	world = WorldScript.new()
+	add_child(world)
+	train = TrainScript.new()
 	add_child(train)
-	box(train,Vector3(0,1.25,0),Vector3(2.2,1.7,4.3),Color("e94e4e"))
-	box(train,Vector3(0,2.3,-0.4),Vector3(2,0.55,2.6),Color("f9e6a3"))
-	box(train,Vector3(0,1.8,-2.25),Vector3(1.6,1.2,0.25),Color("ffe4a1"))
-	for z in [-1.4,1.4]:
-		for x in [-1.05,1.05]:
-			box(train,Vector3(x,0.45,z),Vector3(0.25,0.8,0.8),Color("313943"))
+	sounds = SoundScript.new()
+	add_child(sounds)
 	camera = Camera3D.new()
 	camera.current = true
+	camera.fov = 69.0
 	add_child(camera)
+	_build_hud()
+	_display_message("Welcome aboard! Tap GO to start driving.", 5.0)
+	_update_camera(1.0)
 
-func _build_controls() -> void:
-	var ui := CanvasLayer.new()
-	add_child(ui)
-	var panel := Control.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(panel)
-	var title := Label.new()
-	title.text = "LITTLE RAILWAYS  •  Free Drive"
-	title.position = Vector2(22,16)
-	panel.add_child(title)
+
+func _build_hud() -> void:
+	var overlay := CanvasLayer.new()
+	add_child(overlay)
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(root)
+
+	var top_panel := PanelContainer.new()
+	top_panel.anchor_left = 0.015
+	top_panel.anchor_top = 0.018
+	top_panel.anchor_right = 0.38
+	top_panel.anchor_bottom = 0.018
+	top_panel.offset_bottom = 156.0
+	top_panel.add_theme_stylebox_override("panel", _style(Color("172f45db"), 16))
+	root.add_child(top_panel)
+	var readouts := VBoxContainer.new()
+	readouts.add_theme_constant_override("separation", 3)
+	top_panel.add_child(readouts)
+	var heading := Label.new()
+	heading.text = "LITTLE RAILWAYS   |   FREE DRIVE"
+	heading.add_theme_font_size_override("font_size", 21)
+	heading.add_theme_color_override("font_color", Color("fff0c2"))
+	readouts.add_child(heading)
 	speed_label = Label.new()
-	speed_label.position = Vector2(22,45)
-	panel.add_child(speed_label)
-	var buttons := HBoxContainer.new()
-	buttons.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	buttons.offset_top = -88
-	buttons.offset_bottom = -12
-	buttons.add_theme_constant_override("separation",12)
-	panel.add_child(buttons)
-	_add_button(buttons,"SLOW",func(): throttle = maxf(0.0,throttle-0.25))
-	_add_button(buttons,"GO",func(): throttle = minf(1.0,throttle+0.25))
-	_add_button(buttons,"BRAKE",func(): speed = maxf(0.0,speed-5.0); throttle = 0.0)
-	_add_button(buttons,"HORN!",func(): speed_label.text = "TOOT TOOT! 🚂")
-	_add_button(buttons,"CAMERA",func(): camera_inside = not camera_inside)
+	speed_label.add_theme_font_size_override("font_size", 30)
+	speed_label.add_theme_color_override("font_color", Color.WHITE)
+	readouts.add_child(speed_label)
+	throttle_label = Label.new()
+	throttle_label.add_theme_font_size_override("font_size", 19)
+	readouts.add_child(throttle_label)
+	throttle_bar = ProgressBar.new()
+	throttle_bar.min_value = 0
+	throttle_bar.max_value = 100
+	throttle_bar.show_percentage = false
+	throttle_bar.custom_minimum_size.y = 17
+	throttle_bar.add_theme_stylebox_override("background", _style(Color("40556b"), 7))
+	throttle_bar.add_theme_stylebox_override("fill", _style(Color("7ee18a"), 7))
+	readouts.add_child(throttle_bar)
 
-func _add_button(row: HBoxContainer, caption: String, callback: Callable) -> void:
-	var b := Button.new()
-	b.text = caption
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.pressed.connect(callback)
-	row.add_child(b)
+	var message_panel := PanelContainer.new()
+	message_panel.anchor_left = 0.39
+	message_panel.anchor_right = 0.985
+	message_panel.anchor_top = 0.018
+	message_panel.anchor_bottom = 0.018
+	message_panel.offset_bottom = 61
+	message_panel.add_theme_stylebox_override("panel", _style(Color("172f45cf"), 14))
+	root.add_child(message_panel)
+	message_label = Label.new()
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	message_label.add_theme_font_size_override("font_size", 20)
+	message_label.add_theme_color_override("font_color", Color("fff3dd"))
+	message_panel.add_child(message_label)
+
+	var control_panel := PanelContainer.new()
+	control_panel.anchor_left = 0.018
+	control_panel.anchor_right = 0.982
+	control_panel.anchor_top = 1.0
+	control_panel.anchor_bottom = 1.0
+	control_panel.offset_top = -122
+	control_panel.offset_bottom = -12
+	control_panel.add_theme_stylebox_override("panel", _style(Color("18344be6"), 18))
+	root.add_child(control_panel)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 12)
+	control_panel.add_child(buttons)
+
+	var go_button := _button(buttons, "GO  +", Color("268b57"))
+	go_button.pressed.connect(func() -> void: train.set_throttle(train.throttle + 0.2))
+	go_button.button_down.connect(func() -> void: go_held = true)
+	go_button.button_up.connect(func() -> void: go_held = false)
+
+	var slow_button := _button(buttons, "SLOW  -", Color("376d94"))
+	slow_button.pressed.connect(func() -> void: train.set_throttle(train.throttle - 0.2))
+	slow_button.button_down.connect(func() -> void: slow_held = true)
+	slow_button.button_up.connect(func() -> void: slow_held = false)
+
+	var brake_button := _button(buttons, "BRAKE", Color("c3574f"))
+	brake_button.button_down.connect(func() -> void:
+		brake_held = true
+		train.stop()
+		train.speed_mps = maxf(0.0, train.speed_mps - 3.0)
+	)
+	brake_button.button_up.connect(func() -> void: brake_held = false)
+
+	var horn_button := _button(buttons, "HORN", Color("b47b30"))
+	horn_button.pressed.connect(func() -> void:
+		sounds.horn()
+		_display_message("TOOT TOOT!", 1.4)
+	)
+
+	camera_button = _button(buttons, "CAMERA", Color("6855a0"))
+	camera_button.pressed.connect(_next_camera)
+
+
+func _style(color: Color, corner: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.set_corner_radius_all(corner)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	return style
+
+
+func _button(parent: HBoxContainer, label_text: String, color: Color) -> Button:
+	var button := Button.new()
+	button.text = label_text
+	button.custom_minimum_size = Vector2(116, 83)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 25)
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_stylebox_override("normal", _style(color, 15))
+	button.add_theme_stylebox_override("hover", _style(color.lightened(0.15), 15))
+	button.add_theme_stylebox_override("pressed", _style(color.darkened(0.22), 15))
+	parent.add_child(button)
+	return button
+
+
+func _next_camera() -> void:
+	camera_mode = (camera_mode + 1) % CAMERA_NAMES.size()
+	camera_button.text = "VIEW: " + CAMERA_NAMES[camera_mode].to_upper()
+	_display_message(CAMERA_NAMES[camera_mode] + " camera", 1.6)
+
+
+func _display_message(text: String, duration: float) -> void:
+	message_label.text = text
+	message_seconds = duration
+
+
+func _physics_process(delta: float) -> void:
+	if go_held and not brake_held:
+		train.set_throttle(train.throttle + 0.60 * delta)
+	if slow_held:
+		train.set_throttle(train.throttle - 0.75 * delta)
+	train.brake_held = brake_held
+	train.advance(delta)
+	sounds.update_motor(train.speed_mps / train.MAX_SPEED_MPS)
+	_check_stations()
+
+
+func _check_stations() -> void:
+	for i in range(world.STATION_NAMES.size()):
+		var angle := TAU * float(i) / float(world.STATION_NAMES.size())
+		var distance := absf(wrapf(train.travel_angle - angle, -PI, PI))
+		if distance > 0.23 and last_arrived_station == i:
+			last_arrived_station = -1
+		if distance < 0.115 and train.speed_mps < 0.65 and last_arrived_station != i:
+			last_arrived_station = i
+			sounds.arrival()
+			_display_message("Arrived at " + world.STATION_NAMES[i] + " Station!", 5.0)
+
 
 func _process(delta: float) -> void:
-	speed = move_toward(speed, throttle * 12.0, delta * (3.0 if throttle > 0.0 else 4.0))
-	progress += speed * delta / TRACK_RADIUS
-	var a := progress
-	train.position = Vector3(cos(a)*TRACK_RADIUS,0.1,sin(a)*TRACK_RADIUS)
-	train.rotation.y = -a
-	var follow := train.global_position + Vector3(cos(a)*7,6,sin(a)*7)
-	if camera_inside:
-		follow = train.global_position + Vector3(0,2.5,0)
-	camera.global_position = camera.global_position.lerp(follow,minf(1.0,delta*4.0))
-	camera.look_at(train.global_position + Vector3(-sin(a)*4,1.3,cos(a)*4),Vector3.UP)
-	speed_label.text = "Speed: %d km/h  |  Power: %d%%" % [roundi(speed*5),roundi(throttle*100)]
+	_update_camera(delta)
+	speed_label.text = "SPEED: %02d km/h" % roundi(train.speed_kmh())
+	throttle_label.text = "Power: %d%%" % roundi(train.throttle * 100.0)
+	throttle_bar.value = train.throttle * 100.0
+	if message_seconds > 0:
+		message_seconds -= delta
+		if message_seconds <= 0:
+			message_label.text = "Explore the railway. Stop at the stations!"
+
+
+func _update_camera(delta: float) -> void:
+	var offset := Vector3(0, 4.4, 9.7)
+	var aim := Vector3(0, 1.7, -5.0)
+	match camera_mode:
+		1:
+			offset = Vector3(0, 3.0, 0.55)
+			aim = Vector3(0, 1.8, -15.0)
+		2:
+			offset = Vector3(9.5, 6.5, 7.5)
+			aim = Vector3(0, 1.6, -2.0)
+	var destination := train.to_global(offset)
+	camera.global_position = camera.global_position.lerp(destination, clampf(delta * 4.5, 0.0, 1.0))
+	camera.look_at(train.to_global(aim), Vector3.UP)
