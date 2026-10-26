@@ -1,5 +1,5 @@
 extends Node3D
-## Little Railways v0.3: board, drive, deliver, score, unlock and resume.
+## Little Railways v0.4: Android debug build; passenger missions and offline progress.
 
 const WorldScript = preload("res://scripts/world.gd")
 const TrainScript = preload("res://scripts/train.gd")
@@ -80,7 +80,7 @@ func _build_hud() -> void:
 	readouts.add_theme_constant_override("separation", 4)
 	dashboard.add_child(readouts)
 	var title := Label.new()
-	title.text = "LITTLE RAILWAYS  /  v0.3"
+	title.text = "LITTLE RAILWAYS  /  v0.4"
 	title.add_theme_font_size_override("font_size", 21)
 	title.add_theme_color_override("font_color", Color("fff2c4"))
 	readouts.add_child(title)

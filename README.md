@@ -1,8 +1,8 @@
-# Little Railways — v0.3 Passenger Adventures
+# Little Railways — v0.4 Android Debug Build
 
 A colorful, **offline** Godot 4 Android-friendly train simulator designed for kids aged 5–10. No account, analytics, ads, external asset downloads, or in-app purchases.
 
-> **Build status:** Godot project source is committed and smoke-test automation is configured. An APK has **not** been built or device-tested in this environment.
+> **Build status:** The GitHub Actions workflow is configured to build a signed **debug APK** and upload it for testing. The APK and device behavior are **not confirmed** until the workflow succeeds and someone installs it on Android.
 
 ## What is playable
 
@@ -46,18 +46,45 @@ A colorful, **offline** Godot 4 Android-friendly train simulator designed for ki
 
 GitHub Actions runs this smoke test on every push and pull request. Tests check the scene, train audio, braking/door interlock, 10 trips, scoring, unlock thresholds, replay, and save/load. This does **not** replace Android device testing.
 
-## Android APK export
+## Get the installable Android debug APK (GitHub Actions)
 
-1. Install Godot Android export templates and Android SDK/JDK 17; set SDK/JDK paths in **Editor Settings > Export > Android**.
-2. Add an **Android** export preset under **Project > Export**, with a unique application ID and your own signing credentials.
-3. Export a **debug APK**, test it on a physical Android device in landscape mode, and check performance, multitouch and audio levels.
-4. For publication, use a signed **AAB** and check Google's current Families policies.
+1. Open **[GitHub Actions → Build Android debug APK](https://github.com/iangumi/liitle-railways/actions/workflows/android-debug-apk.yml)**.
+2. Open the newest successful run (green check). If there is no run yet, choose **Run workflow** on the `main` branch.
+3. Scroll to **Artifacts**, download `little-railways-v0.4-debug-apk` and extract the ZIP.
+4. Transfer `little-railways-debug.apk` to the Android phone, open it, and allow **Install unknown apps** for the app you used to open the APK if Android prompts.
+5. Launch **Little Railways** and test the checklist below.
 
-No generated APK or signing keys are stored in this repository.
+**This is a debug build, not a Play Store release.** The download is a build artifact, not a GitHub Release. Artifacts are retained 30 days and GitHub may require signing in. If a new APK refuses to install over the old one, uninstall the old test app and retry. This happens if builds were signed with different ephemeral debug keys (uninstalling may remove local save data).
+
+To keep debug updates installable **without uninstalling**, create a stable local test keystore (alias `androiddebugkey`, password `android`) and add its base64 contents as the private GitHub Actions secret `ANDROID_DEBUG_KEYSTORE_BASE64`. **Never commit the keystore or a production key.** This secret is optional and is not required to build a first debug APK.
+
+The CI build uses **Godot 4.4.1**, matching export templates, Java 17 and the Android SDK. Its workflow imports scripts, runs gameplay smoke tests, exports APK, checks the APK archive and uploads its SHA256 checksum. Builds stop if earlier tests fail.
+
+### Local Android export
+
+1. Install Godot 4.4.1 and matching Android export templates.
+2. Install Android SDK and JDK 17, set both paths under **Editor Settings → Export → Android**.
+3. Set debug signing in Godot; `export_presets.cfg` includes only nonsecret options.
+4. Run `python3 tools/verify_android_build.py`, then `godot --headless --path . --editor --import --quit` and `godot --headless --path . --script res://tests/smoke_test.gd`.
+5. Export the `Android` debug preset to `build/little-railways-debug.apk`, or execute `godot --headless --path . --export-debug Android build/little-railways-debug.apk`.
+
+### Physical Android test checklist
+
+- [ ] App installs and opens in **landscape** without crashing.
+- [ ] HUD/buttons fit on the phone and remain touchable near the screen edges.
+- [ ] GO, SLOW and BRAKE change train motion; doors cannot open while moving.
+- [ ] Doors allow passenger boarding when stopped at Sunflower.
+- [ ] Arrival at Riverbend completes trip 1, awards stars/tickets and moves to the next mission.
+- [ ] HORN and arrival chime are audible; CAMERA cycles all three views.
+- [ ] Background/close/reopen preserves progress and train choice.
+- [ ] Longer driving doesn't freeze, overheat, or drop frames excessively.
+
+For eventual Google Play publication, we'll need a signed production AAB and the Families policy requirements, not this debug artifact.
 
 ## Project layout
 
 ```text
+export_presets.cfg      Safe Android export preset (no secrets)
 project.godot           Godot settings
 main.tscn              Main scene
 main.gd                Touch HUD, cameras, game and station interactions
@@ -67,7 +94,8 @@ scripts/passengers.gd  Waiting passengers and walking-to-train animation
 scripts/mission.gd     Ten-trip campaign, rewards, progression and local save
 scripts/sound_fx.gd    Procedural horn, motor and arrival chime
 tests/smoke_test.gd    Headless gameplay and save/replay regression checks
-.github/workflows/    Automatic headless regression checks
+.github/workflows/    Automated Godot tests + Android debug APK artifact
+tools/                  Standalone static Android build preflight
 ```
 
 ## Known limitations
@@ -77,8 +105,8 @@ tests/smoke_test.gd    Headless gameplay and save/replay regression checks
 - The three locomotive variants share one chassis, not three realistic physics models.
 - Mission guidance is English-only, with no voice prompts yet.
 - Saving occurs after boarding, deliveries, model changes, and when the app pauses or closes. A hard crash mid-trip may restore the last checkpoint.
-- A Godot runtime and physical Android phone are still required for validation before calling this a release-ready game.
+- A successful GitHub Actions build and physical Android gameplay session are still required before calling this a verified playable build.
 
-## Candidate v0.4 goals
+## Candidate v0.5 goals
 
-New route branching, additional passenger types, animated level crossings, optional touch-simplified "Little Driver" mode, and a downloadable debug APK from CI.
+Add touch-simplified **Little Driver** mode for ages 5–6, responsive layout on small phones, animated level crossings, and a first performance-tested mobile visual pass.

@@ -12,3 +12,8 @@
 Thumbs.db
 .vscode/
 .idea/
+
+# CI and local Android exports
+/build/
+/android/build/
+*.env
