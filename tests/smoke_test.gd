@@ -16,8 +16,11 @@ func _run_checks() -> void:
 	print("SMOKE: Instantiating main scene")
 	var app = packed_scene.instantiate()
 	root.add_child(app)
-	# _ready() runs when the scene enters the tree. Awaiting process_frame
-	# from the --script SceneTree runner can indefinitely stall in headless CI.
+	# A parse error may leave this as a bare Node3D instead of the game script.
+	# Fail immediately, rather than accessing app.train and hanging until timeout.
+	if app.get_script() == null:
+		_fail("main.gd failed to load (check import logs for parser errors)")
+		return
 	print("SMOKE: Main scene ready; checking train and sounds")
 	if app.train == null or app.passengers == null or app.missions == null:
 		_fail("gameplay components missing")

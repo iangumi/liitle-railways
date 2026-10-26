@@ -19,8 +19,17 @@ jobs:
         with:
           version: 4.4.1
           use-dotnet: false
-      - name: Import project
-        run: godot --headless --path . --editor --import --quit
+      - name: Import and strictly validate scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --path . --editor --import --quit \
+            2>&1 | tee "$RUNNER_TEMP/godot-import.log"
+          if grep -Eiq 'SCRIPT ERROR:|ERROR: Failed to load script|Parse Error:' "$RUNNER_TEMP/godot-import.log"; then
+            echo 'Godot script import failed despite the editor exit code.' >&2
+            exit 1
+          fi
       - name: Smoke test driving and audio (90s hard limit)
         shell: bash
         run: |

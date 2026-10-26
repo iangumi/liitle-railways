@@ -96,8 +96,18 @@ jobs:
       - name: Validate project and Android preset
         run: python3 tools/verify_android_build.py
 
-      - name: Import Godot assets and scripts
-        run: godot --headless --path . --editor --import --quit
+      - name: Import and strictly validate Godot scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --path . --editor --import --quit \
+            2>&1 | tee "$RUNNER_TEMP/godot-import.log"
+          # Godot sometimes exits 0 after GDScript parse errors. Fail closed.
+          if grep -Eiq 'SCRIPT ERROR:|ERROR: Failed to load script|Parse Error:' "$RUNNER_TEMP/godot-import.log"; then
+            echo 'Godot import reported script errors; refusing APK export.' >&2
+            exit 1
+          fi
 
       - name: Run Godot gameplay smoke tests (90s hard limit)
         shell: bash

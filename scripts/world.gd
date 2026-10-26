@@ -88,7 +88,7 @@ func _make_railway() -> void:
 		var sleeper := make_box(self, middle + Vector3.UP * 0.13, Vector3(2.85, 0.17, 0.24), Color("866247"))
 		sleeper.rotation.y = -a
 		for side in [-0.9, 0.9]:
-			var rail_pos := middle + radial * side + Vector3.UP * 0.255
+			var rail_pos: Vector3 = middle + radial * side + Vector3.UP * 0.255
 			var rail := make_box(self, rail_pos, Vector3(0.10, 0.14, 1.07), Color("d1d9e3"))
 			rail.rotation.y = -a
 

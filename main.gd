@@ -211,7 +211,7 @@ func _station_nearby() -> int:
 	var closest_distance := 3.15
 	for index in range(3):
 		var center := TAU * float(index) / 3.0
-		var metres := absf(wrapf(train.travel_angle - center, -PI, PI)) * train.TRACK_RADIUS
+		var metres: float = absf(wrapf(train.travel_angle - center, -PI, PI)) * train.TRACK_RADIUS
 		if metres <= closest_distance:
 			closest_distance = metres
 			closest_station = index
@@ -241,8 +241,8 @@ func _toggle_doors() -> void:
 			_display_message("Passengers are waiting at %s Station." % MissionScript.STATIONS[missions.source_station()], 4.0)
 	elif missions.phase == MissionScript.Phase.DELIVERY:
 		var target_angle := TAU * float(station) / 3.0
-		var stop_distance := absf(wrapf(train.travel_angle - target_angle, -PI, PI)) * train.TRACK_RADIUS
-		var before_unlocks := missions.total_deliveries
+		var stop_distance: float = absf(wrapf(train.travel_angle - target_angle, -PI, PI)) * train.TRACK_RADIUS
+		var before_unlocks: int = missions.total_deliveries
 		var reward: Dictionary = missions.deliver_at(station, stop_distance)
 		if reward.get("success", false):
 			var stars_text := "★".repeat(int(reward["stars"]))
@@ -285,9 +285,9 @@ func _refresh_mission_hud() -> void:
 
 
 func _next_train() -> void:
-	var next_index := missions.selected_train
+	var next_index: int = missions.selected_train
 	for attempt in range(1, 4):
-		var candidate := (missions.selected_train + attempt) % MissionScript.TRAIN_NAMES.size()
+		var candidate: int = (missions.selected_train + attempt) % MissionScript.TRAIN_NAMES.size()
 		if missions.is_train_unlocked(candidate):
 			next_index = candidate
 			break
@@ -371,7 +371,7 @@ func _update_camera(delta: float) -> void:
 		2:
 			offset = Vector3(9.5, 6.5, 7.5)
 			aim = Vector3(0, 1.6, -2.0)
-	var destination := train.to_global(offset)
+	var destination: Vector3 = train.to_global(offset)
 	camera.global_position = camera.global_position.lerp(destination, clampf(delta * 4.5, 0.0, 1.0))
 	camera.look_at(train.to_global(aim), Vector3.UP)
 
