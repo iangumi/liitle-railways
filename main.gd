@@ -156,10 +156,7 @@ func _build_hud() -> void:
 	doors_button = _button(buttons, "DOORS", Color("a26c36"))
 	doors_button.pressed.connect(_toggle_doors)
 	var horn := _button(buttons, "HORN", Color("a87739"))
-	horn.pressed.connect(func() -> void:
-		sounds.horn()
-		_display_message("TOOT TOOT!", 1.3)
-	)
+	horn.pressed.connect(_play_horn_with_diagnostics)
 	camera_button = _button(buttons, "CAMERA", Color("6857a7"))
 	camera_button.pressed.connect(_next_camera)
 	train_button = _button(buttons, "TRAINS", Color("417b81"))
@@ -385,3 +382,12 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
 		if missions != null and train != null:
 			_save_game()
+
+
+func _play_horn_with_diagnostics() -> void:
+	sounds.horn()
+	_display_message("TOOT TOOT!", 1.3)
+	await get_tree().create_timer(0.25).timeout
+	var report: String = sounds.audio_report()
+	print("AUDIO: ", report)
+	_display_message(report, 12.0)

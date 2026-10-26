@@ -33,6 +33,15 @@ jobs:
       - name: Validate Android settings with Godot's parser
         run: timeout --signal=TERM --kill-after=5s 30s godot --headless --path . --script res://tests/android_preflight.gd
 
+      - name: Verify generated audio reaches Master output
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 30s \
+            godot --headless --path . --script res://tests/audio_test.gd \
+            2>&1 | tee "$RUNNER_TEMP/godot-audio.log"
+          grep -Fq "PASS: generated sounds decode and horn reaches Master output" "$RUNNER_TEMP/godot-audio.log"
+
       - name: Smoke test driving and audio (90s hard limit)
         shell: bash
         run: |

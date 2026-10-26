@@ -123,6 +123,15 @@ jobs:
           # Godot can return zero even after some script errors: require success output.
           grep -Fq "PASS v0.3: scene, train, sound, door safety, 10 trips, rewards, unlocks, save/load, replay" "$RUNNER_TEMP/godot-smoke.log"
 
+      - name: Verify generated audio reaches Master output
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 30s \
+            godot --headless --path . --script res://tests/audio_test.gd \
+            2>&1 | tee "$RUNNER_TEMP/godot-audio.log"
+          grep -Fq "PASS: generated sounds decode and horn reaches Master output" "$RUNNER_TEMP/godot-audio.log"
+
       - name: Export Android debug APK
         shell: bash
         run: |

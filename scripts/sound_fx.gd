@@ -91,3 +91,9 @@ func update_motor(speed_ratio: float) -> void:
 	var ratio := clampf(speed_ratio, 0.0, 1.0)
 	motor_player.volume_db = lerpf(-43.0, -19.0, ratio)
 	motor_player.pitch_scale = lerpf(0.75, 1.4, ratio)
+
+
+func audio_report() -> String:
+	var peak := maxf(AudioServer.get_bus_peak_volume_left_db(0, 0), AudioServer.get_bus_peak_volume_right_db(0, 0))
+	var muted := AudioServer.is_bus_mute(0)
+	return "Output: %s | %.0f dB | muted: %s | horn: %s" % [AudioServer.get_driver_name(), peak, muted, horn_player.playing]
