@@ -34,21 +34,33 @@ jobs:
           use-dotnet: false
           include-templates: true
 
-      - name: Install Android SDK command-line tools
-        uses: android-actions/setup-android@v3
-
+      # GitHub-hosted ubuntu-latest includes an Android SDK and modern
+      # command-line tools. android-actions/setup-android@v3 tries to install
+      # the obsolete SDK package `tools`, which no longer exists and fails CI.
       - name: Install Godot 4.4 Android SDK requirements
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager --install \
+          : "${ANDROID_HOME:?GitHub runner must provide an Android SDK}"
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            for path in "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"; do
+              if [[ -x "$path" ]]; then
+                SDKMANAGER="$path"
+                break
+              fi
+            done
+          fi
+          if [[ -z "$SDKMANAGER" ]]; then
+            echo 'Android sdkmanager is not installed on this runner' >&2
+            exit 1
+          fi
+          echo "Using Android SDK $ANDROID_HOME and $SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install \
             'platform-tools' \
             'build-tools;34.0.0' \
-            'platforms;android-34' \
-            'cmdline-tools;latest' \
-            'cmake;3.10.2.4988404' \
-            'ndk;23.2.8568313'
+            'platforms;android-34'
 
       - name: Configure Godot Android SDK and debug signing
         shell: bash
