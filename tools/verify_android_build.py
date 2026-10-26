@@ -45,8 +45,14 @@ def main() -> int:
     for key in ('keystore/debug_password', 'keystore/release_password', 'keystore/release'):
         if opt.get(key, '""') != '""':
             errors.append(f'Secret or local signing path accidentally committed in {key}')
-    if 'run/main_scene="res://main.tscn"' not in (ROOT / 'project.godot').read_text():
+    project_config = configparser.ConfigParser(interpolation=None, strict=False)
+    project_config.read(ROOT / 'project.godot', encoding='utf-8')
+    if project_config.get('application', 'run/main_scene', fallback='') != '"res://main.tscn"':
         errors.append('Main scene not configured')
+    # In Godot 4.4, Android export silently fails on Linux when ETC2/ASTC
+    # texture importing is not enabled. Test this before trying to export.
+    if project_config.get('rendering', 'textures/vram_compression/import_etc2_astc', fallback='false') != 'true':
+        errors.append('Android export requires rendering/textures/vram_compression/import_etc2_astc=true')
     if errors:
         print('Preflight failed:\n' + '\n'.join(errors), file=sys.stderr)
         return 1
