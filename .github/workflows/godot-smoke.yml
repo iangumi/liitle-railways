@@ -30,6 +30,9 @@ jobs:
             echo 'Godot script import failed despite the editor exit code.' >&2
             exit 1
           fi
+      - name: Validate Android settings with Godot's parser
+        run: timeout --signal=TERM --kill-after=5s 30s godot --headless --path . --script res://tests/android_preflight.gd
+
       - name: Smoke test driving and audio (90s hard limit)
         shell: bash
         run: |

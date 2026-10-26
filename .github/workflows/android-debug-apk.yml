@@ -109,6 +109,9 @@ jobs:
             exit 1
           fi
 
+      - name: Validate Android settings with Godot's parser
+        run: timeout --signal=TERM --kill-after=5s 30s godot --headless --path . --script res://tests/android_preflight.gd
+
       - name: Run Godot gameplay smoke tests (90s hard limit)
         shell: bash
         run: |
@@ -125,9 +128,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build
-          godot --headless --path . --export-debug Android build/little-railways-debug.apk
+          timeout --signal=TERM --kill-after=5s 300s \
+            godot --headless --verbose --path . --export-debug Android build/little-railways-debug.apk \
+            2>&1 | tee "$RUNNER_TEMP/godot-export.log"
           test -s build/little-railways-debug.apk
           unzip -t build/little-railways-debug.apk | tail -1
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs build/little-railways-debug.apk
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging build/little-railways-debug.apk | tee build/APK-INFO.txt
           sha256sum build/little-railways-debug.apk | tee build/SHA256SUMS.txt
           ls -lh build/little-railways-debug.apk
 
@@ -138,6 +145,16 @@ jobs:
           path: |
             build/little-railways-debug.apk
             build/SHA256SUMS.txt
+            build/APK-INFO.txt
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+
+      - name: Preserve Godot diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-logs
+          path: ${{ runner.temp }}/godot-*.log
+          if-no-files-found: ignore
+          retention-days: 14
