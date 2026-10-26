@@ -46,7 +46,9 @@ def main() -> int:
         if opt.get(key, '""') != '""':
             errors.append(f'Secret or local signing path accidentally committed in {key}')
     project_config = configparser.ConfigParser(interpolation=None, strict=False)
-    project_config.read(ROOT / 'project.godot', encoding='utf-8')
+    # Godot writes config_version before the first INI section. Prepend
+    # a dummy section so Python's ConfigParser can parse it correctly.
+    project_config.read_string('[godot]\n' + (ROOT / 'project.godot').read_text(encoding='utf-8'))
     if project_config.get('application', 'run/main_scene', fallback='') != '"res://main.tscn"':
         errors.append('Main scene not configured')
     # In Godot 4.4, Android export silently fails on Linux when ETC2/ASTC
