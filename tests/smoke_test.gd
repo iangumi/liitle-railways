@@ -13,9 +13,12 @@ func _run_checks() -> void:
 	if packed_scene == null:
 		_fail("main scene cannot load")
 		return
+	print("SMOKE: Instantiating main scene")
 	var app = packed_scene.instantiate()
 	root.add_child(app)
-	await process_frame
+	# _ready() runs when the scene enters the tree. Awaiting process_frame
+	# from the --script SceneTree runner can indefinitely stall in headless CI.
+	print("SMOKE: Main scene ready; checking train and sounds")
 	if app.train == null or app.passengers == null or app.missions == null:
 		_fail("gameplay components missing")
 		return
@@ -25,6 +28,7 @@ func _run_checks() -> void:
 	if app.sounds.horn_player == null or app.sounds.motor_player == null:
 		_fail("audio players missing")
 		return
+	print("SMOKE: Checking acceleration, braking and door safety")
 	app.train.set_throttle(1.0)
 	for i in range(30):
 		app.train.advance(1.0 / 60.0)
@@ -44,6 +48,7 @@ func _run_checks() -> void:
 		return
 	app.train.set_doors(false)
 	# Mission tests use a fresh object so no persistent device state can interfere.
+	print("SMOKE: Checking mission progression")
 	var mission = MissionScript.new()
 	if not mission.board_at(0) or mission.board_at(0):
 		_fail("pickup state transition failed")
@@ -69,6 +74,7 @@ func _run_checks() -> void:
 		_fail("trains should unlock after 3/7 trips")
 		return
 	# Verify local persistence of campaign data and best stars.
+	print("SMOKE: Checking save and replay")
 	if mission.save_progress(2.1) != OK:
 		_fail("save should succeed")
 		return

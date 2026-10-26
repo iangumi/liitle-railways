@@ -21,5 +21,11 @@ jobs:
           use-dotnet: false
       - name: Import project
         run: godot --headless --path . --editor --import --quit
-      - name: Smoke test driving and audio
-        run: godot --headless --path . --script res://tests/smoke_test.gd
+      - name: Smoke test driving and audio (90s hard limit)
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 90s \
+            godot --headless --path . --script res://tests/smoke_test.gd \
+            2>&1 | tee "$RUNNER_TEMP/godot-smoke.log"
+          grep -Fq "PASS v0.3: scene, train, sound, door safety, 10 trips, rewards, unlocks, save/load, replay" "$RUNNER_TEMP/godot-smoke.log"

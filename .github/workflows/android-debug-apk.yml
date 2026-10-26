@@ -99,8 +99,16 @@ jobs:
       - name: Import Godot assets and scripts
         run: godot --headless --path . --editor --import --quit
 
-      - name: Run Godot gameplay smoke tests
-        run: godot --headless --path . --script res://tests/smoke_test.gd
+      - name: Run Godot gameplay smoke tests (90s hard limit)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fail predictably on a stuck SceneTree instead of hanging for 45 minutes.
+          timeout --signal=TERM --kill-after=5s 90s \
+            godot --headless --path . --script res://tests/smoke_test.gd \
+            2>&1 | tee "$RUNNER_TEMP/godot-smoke.log"
+          # Godot can return zero even after some script errors: require success output.
+          grep -Fq "PASS v0.3: scene, train, sound, door safety, 10 trips, rewards, unlocks, save/load, replay" "$RUNNER_TEMP/godot-smoke.log"
 
       - name: Export Android debug APK
         shell: bash
